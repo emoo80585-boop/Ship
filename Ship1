@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>نظام فحص الشحنات — محمد عماد علي توفيق</title>
+<style>
+  :root{
+    --bg-1: #0f1720;     /* dark slate */
+    --bg-2: #16232a;     /* slightly lighter */
+    --card: #f8fafc;     /* card background (light) */
+    --muted: #94a3b8;
+    --accent: #2c6f61;   /* muted teal */
+    --accent-2: #3aa086;
+    --danger: #ef4444;
+    --success: #16a34a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;padding:0;font-family:"Tajawal",sans-serif}
+  body{
+    background: linear-gradient(180deg,var(--bg-1),var(--bg-2));
+    color: #e6eef3;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    padding:18px;
+  }
+  .app{ max-width:1100px; margin:0 auto; }
+
+  header{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .brand{ display:flex; flex-direction:column; gap:4px;}
+  .brand h1{ margin:0; font-size:20px; color:#e6f7f1; }
+  .brand p{ margin:0; color:var(--muted); font-size:13px; }
+
+  .controls{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  button{
+    border:0; border-radius:10px; padding:10px 12px; cursor:pointer;
+    background: linear-gradient(180deg,var(--accent),var(--accent-2)); color:#fff; font-weight:700;
+    box-shadow: 0 8px 18px rgba(2,6,23,0.35);
+  }
+  button.gray{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:#e6eef3 }
+  button.warn{ background: linear-gradient(180deg,#ef4444,#d43d3d); color:#fff; }
+
+  .grid{ display:grid; grid-template-columns: 1fr 360px; gap:16px; }
+  @media (max-width:960px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{
+    background: rgba(248,250,252,0.98); /* light card for readable text */
+    color:#062023;
+    padding:16px; border-radius:12px; box-shadow: 0 12px 40px rgba(2,6,23,0.3);
+  }
+
+  label{ display:block; font-weight:800; margin-bottom:8px; color:#062023; }
+  input[type="text"], textarea, select {
+    width:100%; padding:10px; border-radius:8px; border:1px solid rgba(6,32,35,0.06);
+    font-size:15px; background:#fff; color:#062023; outline:none;
+  }
+  textarea{ min-height:120px; resize:vertical; }
+
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  /* saved list */
+  #savedList{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .chip{
+    background: linear-gradient(180deg, rgba(47,111,97,0.12), rgba(47,111,97,0.06));
+    color:#02382f; padding:8px 12px; border-radius:24px; display:flex; gap:8px; align-items:center; font-weight:800;
+  }
+  .chip button{ background:transparent; border:0; color:#02382f; font-weight:900; cursor:pointer; }
+
+  /* result box */
+  #resultBox{ margin-top:12px; padding:12px; border-radius:10px; font-weight:800; display:none; text-align:center; }
+
+  /* stats */
+  .stats{ display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .stat{
+    background:#fff; color:#052825; padding:10px 12px; border-radius:10px; font-weight:800; box-shadow: 0 8px 20px rgba(2,6,23,0.08);
+  }
+
+  /* history table */
+  table{ width:100%; border-collapse:collapse; margin-top:12px; }
+  th,td{ padding:10px; border-bottom:1px solid rgba(2,6,23,0.06); text-align:right; font-size:14px; color:#062023; }
+  th{ font-weight:900; color:#0a3940; }
+  tr.good{ background: linear-gradient(90deg,#e8faf0,#dff1e6); }
+  tr.bad{ background: linear-gradient(90deg,#fff2f2,#ffe9e9); }
+
+  footer{ margin-top:18px; text-align:center; color:#cfe8ea; font-size:14px; opacity:0.95; }
+
+  .help{ font-size:13px; color:#6b7280; margin-top:8px; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <h1>نظام فحص الشحنات — نسخة احترافية</h1>
+        <p>تم التطوير بواسطة <strong>محمد عماد علي توفيق</strong></p>
+      </div>
+
+      <div class="controls">
+        <button id="tryEnableBtn" class="gray">🔊 تفعيل الصوت (اضغط إن لم يعمل تلقائياً)</button>
+        <button id="stopSoundBtn" class="gray">⏹️ إيقاف الصوت</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Main column -->
+      <section class="card">
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+          <!-- left: targets -->
+          <div style="flex:1; min-width:260px;">
+            <label>أضف أرقام الشحنات (كل سطر = رقم واحد)</label>
+            <textarea id="targetsArea" placeholder="مثال:
+123456789
+987654321"></textarea>
+            <div class="row" style="margin-top:10px;">
+              <button id="saveBtn">💾 حفظ (إضافة)</button>
+              <button id="clearBtn" class="warn">🗑️ حذف الكل</button>
+            </div>
+
+            <div id="savedList" style="margin-top:12px;"></div>
+          </div>
+
+          <!-- right: quick check -->
+          <aside style="width:340px; min-width:220px;">
+            <label>فحص سريع</label>
+            <input id="scanInput" type="text" placeholder="اكتب رقم الشحنة ثم اضغط Enter" />
+            <div class="row" style="margin-top:8px;">
+              <button id="checkBtn">🔍 فحص</button>
+              <button id="clearInputBtn" class="gray">✖ مسح الحقل</button>
+            </div>
+
+            <div id="resultBox"></div>
+
+            <div class="stats" style="margin-top:12px;">
+              <div class="stat" id="allCheckedStat">المفحوصة (فريدة): 0</div>
+              <div class="stat" id="foundStat">الموجودة (فريدة): 0</div>
+              <div class="stat" id="totalScansStat">إجمالي الفحوصات: 0</div>
+            </div>
+
+            <div class="help">عند نتيجة صحيحة: صوت صفارة قوي + اهتزاز (لو الجهاز يدعم). عند خطأ: لون أحمر فقط، بدون صوت.</div>
+          </aside>
+        </div>
+
+        <!-- History -->
+        <div style="margin-top:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <strong>سجل الفحوصات</strong>
+            <div>
+              <button id="clearHistoryBtn" class="gray">🧹 مسح السجل</button>
+            </div>
+          </div>
+
+          <table id="historyTable" aria-live="polite">
+            <thead>
+              <tr><th>الوقت</th><th>رقم الشحنة</th><th>النتيجة</th><th>إجراء</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Sidebar -->
+      <aside class="card">
+        <strong>إعدادات التنبيه</strong>
+        <div style="margin-top:12px;">
+          <label class="help"><input id="soundToggle" type="checkbox" checked> تشغيل الصوت</label>
+          <label class="help"><input id="vibrateToggle" type="checkbox" checked> تشغيل الاهتزاز</label>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label class="help">قوة الصوت</label>
+          <input id="gainRange" type="range" min="0.05" max="0.9" step="0.01" value="0.45">
+        </div>
+
+        <div style="margin-top:16px;" class="help">
+          تحفظ الأرقام والسجل في متصفحك تلقائيًا. هذا النظام مُصمّم للعمل محليًا على أجهزة PDA/موبايل ومتصفحات حديثة.
+        </div>
+      </aside>
+    </main>
+
+    <footer>© جميع الحقوق محفوظة — تم تطوير الموقع بواسطة <strong>محمد عماد علي توفيق</strong></footer>
+  </div>
+
+<script>
+/* ========================
+   Keys & state
+   ======================== */
+const TARGETS_KEY = 'pro_targets_v_final';
+const HISTORY_KEY = 'pro_history_v_final';
+const UNIQUE_ALL_KEY = 'pro_unique_all_v_final';
+const UNIQUE_FOUND_KEY = 'pro_unique_found_v_final';
+
+let targets = [];         // array of target shipment codes
+let historyList = [];     // array of {time, code, found}
+let uniqueAll = new Set();   // all distinct codes that were scanned (right or wrong)
+let uniqueFound = new Set(); // distinct codes that were found (correct)
+let audioCtx = null, osc = null, gainNode = null, stopTimer = null;
+
+/* ========================
+   DOM elements
+   ======================== */
+const targetsArea = document.getElementById('targetsArea');
+const saveBtn = document.getElementById('saveBtn');
+const clearBtn = document.getElementById('clearBtn');
+const savedListDiv = document.getElementById('savedList');
+
+const scanInput = document.getElementById('scanInput');
+const checkBtn = document.getElementById('checkBtn');
+const clearInputBtn = document.getElementById('clearInputBtn');
+const resultBox = document.getElementById('resultBox');
+
+const allCheckedStat = document.getElementById('allCheckedStat');
+const foundStat = document.getElementById('foundStat');
+const totalScansStat = document.getElementById('totalScansStat');
+
+const historyTableBody = document.querySelector('#historyTable tbody');
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+const tryEnableBtn = document.getElementById('tryEnableBtn');
+const stopSoundBtn = document.getElementById('stopSoundBtn');
+const soundToggle = document.getElementById('soundToggle');
+const vibrateToggle = document.getElementById('vibrateToggle');
+const gainRange = document.getElementById('gainRange');
+
+/* ========================
+   Storage helpers
+   ======================== */
+function loadState(){
+  try { targets = JSON.parse(localStorage.getItem(TARGETS_KEY) || '[]'); } catch(e){ targets = []; }
+  try { historyList = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e){ historyList = []; }
+  try { uniqueAll = new Set(JSON.parse(localStorage.getItem(UNIQUE_ALL_KEY) || '[]')); } catch(e){ uniqueAll = new Set(); }
+  try { uniqueFound = new Set(JSON.parse(localStorage.getItem(UNIQUE_FOUND_KEY) || '[]')); } catch(e){ uniqueFound = new Set(); }
+  renderTargets(); renderHistory(); renderStats();
+}
+function saveTargets(){ localStorage.setItem(TARGETS_KEY, JSON.stringify(targets)); }
+function saveHistory(){ localStorage.setItem(HISTORY_KEY, JSON.stringify(historyList)); }
+function saveUniqueAll(){ localStorage.setItem(UNIQUE_ALL_KEY, JSON.stringify([...uniqueAll])); }
+function saveUniqueFound(){ localStorage.setItem(UNIQUE_FOUND_KEY, JSON.stringify([...uniqueFound])); }
+
+/* ========================
+   Render: targets
+   ======================== */
+function renderTargets(){
+  savedListDiv.innerHTML = '';
+  if(!targets || targets.length === 0){
+    savedListDiv.innerHTML = '<div class="help">لا توجد شحنات محفوظة.</div>';
+    return;
+  }
+  targets.forEach((t, idx) => {
+    const d = document.createElement('div');
+    d.className = 'chip';
+    d.innerHTML = `<span>${t}</span><button title="حذف" onclick="removeTarget(${idx})">✖</button>`;
+    savedListDiv.appendChild(d);
+  });
+}
+
+/* ========================
+   Actions: add/remove targets
+   ======================== */
+saveBtn.addEventListener('click', ()=>{
+  const raw = targetsArea.value.trim();
+  if(!raw){ alert('أدخل أرقام الشحنات ثم اضغط حفظ'); return; }
+  const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  // append (no replace), avoid duplicates
+  targets = Array.from(new Set([...targets, ...lines]));
+  saveTargets();
+  renderTargets();
+  targetsArea.value = '';
+  alert('✅ تم حفظ الشحنات');
+});
+clearBtn.addEventListener('click', ()=>{
+  if(!confirm('هل تريد حذف جميع الشحنات؟')) return;
+  targets = []; saveTargets(); renderTargets();
+});
+window.removeTarget = function(i){
+  if(i>=0 && i<targets.length){ targets.splice(i,1); saveTargets(); renderTargets(); }
+};
+
+/* ========================
+   History rendering & management
+   ======================== */
+function renderHistory(){
+  historyTableBody.innerHTML = '';
+  if(!historyList || historyList.length === 0){
+    historyTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:12px">لا توجد سجلات بعد</td></tr>`;
+    return;
+  }
+  const arr = [...historyList].reverse(); // latest first
+  arr.forEach((h, idx)=>{
+    const realIndex = historyList.length - 1 - idx;
+    const tr = document.createElement('tr');
+    tr.className = h.found ? 'good' : 'bad';
+    tr.innerHTML = `<td style="direction:ltr">${new Date(h.time).toLocaleString()}</td>
+      <td style="direction:ltr">${h.code}</td>
+      <td>${h.found ? '<strong style="color:#0b6b3a">موجود</strong>' : '<strong style="color:#a02828">غير موجود</strong>'}</td>
+      <td><button onclick="deleteHistory(${realIndex})" class="gray">حذف</button></td>`;
+    historyTableBody.appendChild(tr);
+  });
+}
+function deleteHistory(index){
+  if(index>=0 && index < historyList.length){
+    historyList.splice(index,1);
+    saveHistory(); renderHistory(); renderStats();
+  }
+}
+clearHistoryBtn.addEventListener('click', ()=>{
+  if(!confirm('مسح سجل الفحوصات بالكامل؟')) return;
+  historyList = []; saveHistory(); renderHistory();
+  uniqueAll = new Set(); uniqueFound = new Set();
+  saveUniqueAll(); saveUniqueFound(); renderStats();
+});
+
+/* ========================
+   Stats
+   ======================== */
+function renderStats(){
+  allCheckedStat.innerText = 'المفحوصة (فريدة): ' + uniqueAll.size;
+  foundStat.innerText = 'الموجودة (فريدة): ' + uniqueFound.size;
+  totalScansStat.innerText = 'إجمالي الفحوصات: ' + historyList.length;
+}
+
+/* ========================
+   Audio & Vibrate
+   ======================== */
+async function tryEnableAudio(){
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+    tryEnableBtn.innerText = '✅ الصوت جاهز';
+    tryEnableBtn.disabled = true;
+    return true;
+  } catch(e){
+    console.warn('audio enable failed', e);
+    alert('المتصفح منع التشغيل التلقائي للصوت — اضغط "تفعيل الصوت" أو جرب متصفح آخر.');
+    return false;
+  }
+}
+tryEnableBtn.addEventListener('click', ()=> tryEnableAudio());
+stopSoundBtn.addEventListener('click', stopAll);
+
+function playBeep(duration = 4000){
+  if(!audioCtx) return;
+  if(!soundToggle.checked) return;
+  stopAll();
+  osc = audioCtx.createOscillator();
+  gainNode = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  const g = parseFloat(gainRange.value) || 0.45;
+  gainNode.gain.setValueAtTime(g, audioCtx.currentTime);
+  osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+  osc.start();
+  if(vibrateToggle.checked && navigator.vibrate) navigator.vibrate([300,120,300,120,300]);
+  stopTimer = setTimeout(()=> stopAll(), duration);
+}
+function stopAll(){
+  if(stopTimer){ clearTimeout(stopTimer); stopTimer = null; }
+  try{ if(osc){ osc.stop(); osc.disconnect(); osc=null; } if(gainNode){ gainNode.disconnect(); gainNode=null; } }catch(e){}
+  if(navigator.vibrate) navigator.vibrate(0);
+  // hide result after small delay (UI reset handled elsewhere)
+}
+
+/* ========================
+   Check logic
+   ======================== */
+function checkCode(raw){
+  const code = String(raw || '').trim();
+  if(!code){ alert('أدخل رقم الشحنة للفحص'); return; }
+
+  // record that this code was scanned (unique all)
+  if(!uniqueAll.has(code)){
+    uniqueAll.add(code); saveUniqueAll();
+  }
+
+  const found = targets.includes(code);
+  // push to history
+  historyList.push({ time: Date.now(), code: code, found: !!found });
+  saveHistory();
+
+  // if found and first time found, add to uniqueFound
+  if(found && !uniqueFound.has(code)){
+    uniqueFound.add(code); saveUniqueFound();
+  }
+
+  // show visual
+  showResult(found, code);
+
+  // play beep only on found
+  if(found){
+    // ensure audio enabled
+    if(!audioCtx) { tryEnableAudio().then(ok => { if(ok) playBeep(4000); else {/*silent*/} }); }
+    else playBeep(4000);
+  }
+
+  // update UI
+  renderHistory();
+  renderStats();
+}
+
+/* visual result (keeps background readable, not white) */
+function showResult(found, code){
+  resultBox.style.display = 'block';
+  if(found){
+    resultBox.classList.remove('visual-fail'); resultBox.classList.add('visual-success');
+    resultBox.style.background = 'linear-gradient(90deg,#dff7ea,#b9eacb)';
+    resultBox.style.color = '#053022';
+    resultBox.innerText = '✅ تم العثور على الشحنة: ' + code;
+    document.body.style.background = 'linear-gradient(180deg,#e8f8f2,#dff1e6)';
+  } else {
+    resultBox.classList.remove('visual-success'); resultBox.classList.add('visual-fail');
+    resultBox.style.background = 'linear-gradient(90deg,#fff2f2,#ffe9e9)';
+    resultBox.style.color = '#3c0303';
+    resultBox.innerText = '❌ الشحنة غير موجودة: ' + code;
+    document.body.style.background = 'linear-gradient(180deg,#fff6f6,#ffecec)';
+  }
+  // clear input
+  scanInput.value = '';
+  // restore theme after delay
+  setTimeout(()=> {
+    document.body.style.background = 'linear-gradient(180deg,var(--bg-1),var(--bg-2))';
+    resultBox.style.display = 'none';
+  }, found ? 4200 : 2200);
+}
+
+/* Bind check button and Enter */
+checkBtn.addEventListener('click', ()=> checkCode(scanInput.value));
+scanInput.addEventListener('keydown', (e)=> { if(e.key === 'Enter'){ e.preventDefault(); checkCode(e.target.value); } });
+clearInputBtn.addEventListener('click', ()=> { scanInput.value = ''; scanInput.focus(); });
+
+/* ========================
+   Init
+   ======================== */
+(function init(){
+  loadState();
+  // try auto enable audio (may be blocked by browser)
+  tryEnableAudio();
+})();
+</script>
+</body>
+</html>
